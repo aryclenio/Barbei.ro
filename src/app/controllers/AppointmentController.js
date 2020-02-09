@@ -1,13 +1,12 @@
 import * as Yup from 'yup';
-import {
-  startOfHour, parseISO, isBefore, format, subHours,
-} from 'date-fns';
+import { startOfHour, parseISO, isBefore, format, subHours } from 'date-fns';
 import pt from 'date-fns/locale/pt-BR';
 import Appointment from '../models/appointment';
 import User from '../models/user';
 import File from '../models/file';
 import Notification from '../schemas/Notification';
-import Mail from '../../lib/Mail';
+import Queue from '../../lib/Queue';
+import CancelationMail from '../jobs/CancellationMail';
 
 class AppointmentController {
   async index(req, res) {
@@ -125,20 +124,11 @@ class AppointmentController {
     /** Caso passe as verificações, o campo de cancelamento é preenchido */
     appointment.canceled_at = new Date();
     await appointment.save();
-    Mail.sendMail({
-      to: `${appointment.provider.name} <${appointment.provider.email}>`,
-      subject: 'Agendamento Cancelado',
-      template: 'cancellation',
-      context: {
-        provider: appointment.provider.name,
-        user: appointment.user.name,
-        date: format(
-          appointment.date,
-          "'dia' dd 'de' MMMM', às' H:mm'h'",
-          { locale: pt },
-        ),
-      },
+
+    await Queue.add(CancelationMail.key, {
+      appointment,
     });
+
     return res.json(appointment);
   }
 }
