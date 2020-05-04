@@ -2,6 +2,7 @@
 /* eslint-disable no-confusing-arrow */
 import * as Yup from 'yup';
 import User from '../models/user';
+import File from '../models/file';
 
 class UserController {
   async store(req, res) {
@@ -42,10 +43,12 @@ class UserController {
         .min(6)
         .when('oldPassword', (oldPassword, field) =>
           // eslint-disable-next-line prettier/prettier
-          oldPassword ? field.required() : field),
+          oldPassword ? field.required() : field,
+        ),
       confirmPassword: Yup.string().when('password', (password, field) =>
         // eslint-disable-next-line prettier/prettier
-        password ? field.required().oneOf([Yup.ref('password')]) : field),
+        password ? field.required().oneOf([Yup.ref('password')]) : field,
+      ),
     });
     if (!(await schema.isValid(req.body))) {
       return res.status(400).json({ error: 'Validation fails' });
@@ -65,12 +68,18 @@ class UserController {
       return res.status(401).json({ error: 'Password does not match' });
     }
 
-    const { id, name, provider } = await user.update(req.body);
+    await user.update(req.body);
+    const { id, name, avatar } = await User.findByPk(req.userId, {
+      include: [
+        { model: File, as: 'avatar', attributes: ['id', 'path', 'url'] },
+      ],
+    });
+
     return res.json({
       id,
       name,
       email,
-      provider,
+      avatar,
     });
   }
 }
